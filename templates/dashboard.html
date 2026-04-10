@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Research Dashboard{% endblock %}
+{% block page_subtitle %}Real-time analysis of cross-asset order flow imbalance across NSE equities{% endblock %}
+
+{% block content %}
+<!-- Top-level data summary -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-label">Total Bars</div>
+        <div class="metric-value neutral">{{ "{:,}".format(data_summary.get('n_bars', 0)) }}</div>
+        <div class="metric-sub">{{ data_summary.get('date_range', ['', ''])[0][:10] }} → {{ data_summary.get('date_range', ['', ''])[1][:10] }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Assets Tracked</div>
+        <div class="metric-value">{{ data_summary.get('tickers', [])|length }}</div>
+        <div class="metric-sub">{{ data_summary.get('tickers', [])|join(', ') }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Signal Asset</div>
+        <div class="metric-value" style="font-size:1.3rem">{{ signal_asset }}</div>
+        <div class="metric-sub">Cross-asset OFI source</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Prediction Targets</div>
+        <div class="metric-value">{{ target_assets|length }}</div>
+        <div class="metric-sub">{{ target_assets|join(', ') }}</div>
+    </div>
+</div>
+
+<!-- Key model metrics per target -->
+<div class="section-header">
+    <h2>Model Performance (Ridge — Walk-Forward OOS)</h2>
+    <div class="section-divider"></div>
+    <span class="badge purple">Full Feature Set</span>
+</div>
+
+<div class="metrics-grid">
+    {% for target in target_assets %}
+    {% if target in metrics %}
+    <div class="metric-card">
+        <div class="metric-label">{{ target }} — Mean IC</div>
+        <div class="metric-value {% if metrics[target].ic and metrics[target].ic > 0 %}positive{% elif metrics[target].ic and metrics[target].ic < 0 %}negative{% else %}neutral{% endif %}">
+            {{ "%.4f"|format(metrics[target].ic or 0) }}
+        </div>
+        <div class="metric-sub">
+            R² = {{ "%.6f"|format(metrics[target].r2 or 0) }}
+            {% if metrics[target].ic_tstat %}
+            | t = {{ "%.2f"|format(metrics[target].ic_tstat) }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Backtest key metrics -->
+{% if bt_metrics %}
+<div class="section-header">
+    <h2>Strategy Performance (Realistic Costs: 7 bps)</h2>
+    <div class="section-divider"></div>
+    <span class="badge info">Walk-Forward Backtest</span>
+</div>
+
+<div class="grid-4">
+    {% for target in target_assets %}
+    {% if target in bt_metrics %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{{ target }}</h3>
+        </div>
+        <div style="display:grid; gap:10px;">
+            <div class="stat-card visible">
+                <div class="stat-icon purple">↗</div>
+                <div class="stat-text">
+                    <div class="label">Sharpe Ratio</div>
+                    <div class="value {% if bt_metrics[target].sharpe_ratio and bt_metrics[target].sharpe_ratio > 0 %}positive{% else %}negative{% endif %}">
+                        {{ "%.2f"|format(bt_metrics[target].sharpe_ratio or 0) }}
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card visible">
+                <div class="stat-icon green">%</div>
+                <div class="stat-text">
+                    <div class="label">Total Return</div>
+                    <div class="value">{{ "%.2f"|format((bt_metrics[target].total_return or 0) * 100) }}%</div>
+                </div>
+            </div>
+            <div class="stat-card visible">
+                <div class="stat-icon red">↓</div>
+                <div class="stat-text">
+                    <div class="label">Max Drawdown</div>
+                    <div class="value negative">{{ "%.2f"|format((bt_metrics[target].max_drawdown or 0) * 100) }}%</div>
+                </div>
+            </div>
+            <div class="stat-card visible">
+                <div class="stat-icon cyan">⊕</div>
+                <div class="stat-text">
+                    <div class="label">Win Rate</div>
+                    <div class="value">{{ "%.1f"|format((bt_metrics[target].win_rate or 0) * 100) }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Cumulative PnL Charts -->
+{% if pnl_charts %}
+<div class="section-header">
+    <h2>Cumulative PnL — Cost Sensitivity</h2>
+    <div class="section-divider"></div>
+</div>
+
+<div class="tabs" id="pnlTabs">
+    {% for target in target_assets %}
+    {% if target in pnl_charts %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="pnl-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in pnl_charts %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="pnl-{{ target }}">
+    <div class="card visible">
+        <div class="plotly-chart" id="chart-pnl-{{ target }}" data-chart='{{ pnl_charts[target]|safe }}'></div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}
+
+<!-- Key Findings -->
+{% if research and research.key_findings %}
+<div class="section-header">
+    <h2>Key Findings</h2>
+    <div class="section-divider"></div>
+</div>
+
+<div class="grid-2">
+    {% for finding in research.key_findings %}
+    <div class="finding-card">{{ finding }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        
+        // Deactivate all tabs in this group
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Find all tab contents after this tabs element
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                // Re-render Plotly charts in newly visible tab
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) {
+                        try {
+                            const parsed = JSON.parse(data);
+                            Plotly.react(el.id, parsed.data, parsed.layout, {responsive: true, displayModeBar: false});
+                        } catch(e) {}
+                    }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}

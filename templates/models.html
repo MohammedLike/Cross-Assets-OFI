@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Models — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Models & Incremental R²{% endblock %}
+{% block page_subtitle %}Walk-forward OOS model comparison — Own vs Full (cross-asset) features{% endblock %}
+
+{% block content %}
+<!-- Incremental R2 Summary Cards -->
+{% if incr_tables %}
+<div class="section-header">
+    <h2>Incremental R² — Cross-Asset Value</h2>
+    <div class="section-divider"></div>
+    <span class="badge purple">Full vs Own-Only</span>
+</div>
+
+<div class="metrics-grid">
+    {% for target in target_assets %}
+    {% if target in incr_tables %}
+    <div class="metric-card">
+        <div class="metric-label">{{ target }} — ΔR²</div>
+        <div class="metric-value {% if incr_tables[target].mean_delta_r2 and incr_tables[target].mean_delta_r2 > 0 %}positive{% else %}negative{% endif %}">
+            {{ "%.6f"|format(incr_tables[target].mean_delta_r2 or 0) }}
+        </div>
+        <div class="metric-sub">
+            ΔIC = {{ "%.4f"|format(incr_tables[target].mean_delta_ic or 0) }}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Tabs per target -->
+<div class="tabs" id="modelTabs">
+    {% for target in target_assets %}
+    {% if target in model_tables %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="model-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in model_tables %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="model-{{ target }}">
+    <div class="grid-2">
+        <!-- Performance Table -->
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">{{ target }} — OOS Performance</h3>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>IC (Full)</th>
+                            <th>R² (Full)</th>
+                            <th>IC (Own)</th>
+                            <th>R² (Own)</th>
+                            <th>ΔR²</th>
+                            <th>ΔIC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in model_tables[target] %}
+                        <tr>
+                            <td style="font-weight:600; color:var(--text-primary)">{{ row.model }}</td>
+                            <td class="{% if row.ic_full != 'N/A' and row.ic_full|float > 0 %}positive{% else %}negative{% endif %}">{{ row.ic_full }}</td>
+                            <td>{{ row.r2_full }}</td>
+                            <td>{{ row.ic_own }}</td>
+                            <td>{{ row.r2_own }}</td>
+                            <td class="{% if row.delta_r2 != 'N/A' and row.delta_r2|float > 0 %}positive{% else %}negative{% endif %}">{{ row.delta_r2 }}</td>
+                            <td class="{% if row.delta_ic != 'N/A' and row.delta_ic|float > 0 %}positive{% else %}negative{% endif %}">{{ row.delta_ic }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Model Comparison Chart -->
+        {% if target in model_charts %}
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">{{ target }} — Model Comparison</h3>
+            </div>
+            <div class="plotly-chart" id="chart-model-{{ target }}" data-chart='{{ model_charts[target]|safe }}'></div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="highlight-box">
+    <p><strong>About ΔR²:</strong> The incremental R² (ΔR²) measures how much the cross-asset OFI features improve prediction beyond the target's own OFI. A positive ΔR² means {{ signal_asset }} OFI contains <strong>unique information</strong> not captured by the target's own order flow. Even small ΔR² values (e.g., 0.001) can be economically significant at high-frequency horizons.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) { try { const p = JSON.parse(data); Plotly.react(el.id, p.data, p.layout, {responsive:true,displayModeBar:false}); } catch(e){} }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}

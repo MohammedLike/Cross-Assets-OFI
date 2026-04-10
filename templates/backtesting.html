@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Backtesting — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Strategy Backtesting{% endblock %}
+{% block page_subtitle %}Walk-forward backtest with realistic transaction costs and slippage{% endblock %}
+
+{% block content %}
+<!-- Tabs per target -->
+<div class="tabs" id="btTabs">
+    {% for target in target_assets %}
+    {% if target in pnl_charts %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="bt-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in pnl_charts %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="bt-{{ target }}">
+    <!-- PnL Chart -->
+    <div class="card visible" style="margin-bottom: 20px">
+        <div class="card-header">
+            <h3 class="card-title">{{ target }} — Cumulative PnL (Cost Sensitivity)</h3>
+            <span class="badge info">Walk-Forward OOS</span>
+        </div>
+        <div class="plotly-chart" id="chart-bt-{{ target }}" data-chart='{{ pnl_charts[target]|safe }}'></div>
+    </div>
+
+    <!-- Metrics Table -->
+    {% if target in metrics_tables and metrics_tables[target] %}
+    <div class="card visible">
+        <div class="card-header">
+            <h3 class="card-title">Performance Metrics — {{ target }}</h3>
+            <span class="badge purple">Ridge Model</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cost Scenario</th>
+                        <th>Sharpe Ratio</th>
+                        <th>Total Return</th>
+                        <th>Max Drawdown</th>
+                        <th>Win Rate</th>
+                        <th>Calmar Ratio</th>
+                        <th>Profit Factor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in metrics_tables[target] %}
+                    <tr>
+                        <td style="font-weight:600; color:var(--text-primary)">{{ row.config }}</td>
+                        <td class="{% if row.sharpe != 'N/A' and row.sharpe|float > 0 %}positive{% else %}negative{% endif %}">{{ row.sharpe }}</td>
+                        <td>{{ row.total_return }}</td>
+                        <td class="negative">{{ row.max_drawdown }}</td>
+                        <td>{{ row.win_rate }}</td>
+                        <td>{{ row.calmar }}</td>
+                        <td>{{ row.profit_factor }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- Methodology -->
+<div class="card visible" style="margin-top: 24px">
+    <div class="card-header">
+        <h3 class="card-title">Backtesting Methodology</h3>
+    </div>
+    <div class="grid-2" style="gap:24px; margin-top:8px;">
+        <div>
+            <h4 style="color:var(--text-accent); margin-bottom:8px; font-size:0.9rem">Execution Model</h4>
+            <ul class="report-list">
+                <li>Walk-forward: 6-month train, 1-month OOS</li>
+                <li>Position sizing: signal-proportional, normalised to [-1, +1]</li>
+                <li>Lagged positions (no look-ahead bias)</li>
+                <li>Position updated every bar</li>
+            </ul>
+        </div>
+        <div>
+            <h4 style="color:var(--text-accent); margin-bottom:8px; font-size:0.9rem">Cost Scenarios</h4>
+            <ul class="report-list">
+                <li><strong>Baseline:</strong> 0 bps (theoretical maximum)</li>
+                <li><strong>Low Cost:</strong> 3 bps (institutional / HFT)</li>
+                <li><strong>Realistic:</strong> 7 bps (prop trading desk)</li>
+                <li><strong>High Cost:</strong> 15 bps (retail execution)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="highlight-box">
+    <p><strong>Key Takeaway:</strong> The gap between the "No Costs" and "Realistic" PnL curves quantifies the <strong>implementable alpha</strong>. If the realistic-cost curve remains upward-sloping, the signal has genuine economic value. If it flattens or turns negative, the signal is there but not tradable at this frequency.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) { try { const p = JSON.parse(data); Plotly.react(el.id, p.data, p.layout, {responsive:true,displayModeBar:false}); } catch(e){} }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}

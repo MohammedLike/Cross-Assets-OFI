@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Explainability — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Feature Importance & Explainability{% endblock %}
+{% block page_subtitle %}SHAP values, coefficient stability, and cross-model comparison{% endblock %}
+
+{% block content %}
+<!-- Tabs per target -->
+<div class="tabs" id="explainTabs">
+    {% for target in target_assets %}
+    {% if target in shap_charts %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="explain-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in shap_charts %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="explain-{{ target }}">
+    <!-- SHAP Charts -->
+    <div class="grid-2">
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">SHAP — Ridge Model</h3>
+                <span class="badge purple">Linear SHAP</span>
+            </div>
+            <div class="plotly-chart" id="chart-shap-ridge-{{ target }}" data-chart='{{ shap_charts[target]["ridge"]|safe }}'></div>
+        </div>
+
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">SHAP — XGBoost Model</h3>
+                <span class="badge info">TreeSHAP</span>
+            </div>
+            <div class="plotly-chart" id="chart-shap-xgb-{{ target }}" data-chart='{{ shap_charts[target]["xgboost"]|safe }}'></div>
+        </div>
+    </div>
+
+    <!-- Model Comparison -->
+    {% if target in model_comp_charts %}
+    <div class="card visible" style="margin-top: 20px">
+        <div class="card-header">
+            <h3 class="card-title">Model Comparison — {{ target }}</h3>
+            <span class="badge warning">IC & R²</span>
+        </div>
+        <div class="plotly-chart" id="chart-model-comp-{{ target }}" data-chart='{{ model_comp_charts[target]|safe }}'></div>
+    </div>
+    {% endif %}
+
+    <!-- Coefficient Stability Table -->
+    {% if target in coef_tables and coef_tables[target] %}
+    <div class="card visible" style="margin-top: 20px">
+        <div class="card-header">
+            <h3 class="card-title">Coefficient Stability (50 Bootstrap Iterations)</h3>
+            <span class="badge success">Ridge</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Mean Coef</th>
+                        <th>Std Coef</th>
+                        <th>t-Statistic</th>
+                        <th>% Positive</th>
+                        <th>Stability</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in coef_tables[target] %}
+                    <tr>
+                        <td style="font-weight:500; color:var(--text-primary)">{{ row.feature }}</td>
+                        <td>{{ row.mean_coef }}</td>
+                        <td>{{ row.std_coef }}</td>
+                        <td>{{ row.t_stat }}</td>
+                        <td>{{ row.pct_positive }}</td>
+                        <td>
+                            {% if row.t_stat != 'N/A' and row.t_stat|float|abs > 2 %}
+                            <span class="badge success">Stable</span>
+                            {% elif row.t_stat != 'N/A' and row.t_stat|float|abs > 1 %}
+                            <span class="badge warning">Moderate</span>
+                            {% else %}
+                            <span class="badge danger">Unstable</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="highlight-box">
+    <p><strong>Methodology:</strong> SHAP (SHapley Additive exPlanations) values decompose each prediction into individual feature contributions. For linear models, Linear SHAP provides exact Shapley values. For XGBoost, TreeSHAP exploits tree structure for efficient computation. Bootstrap stability tests whether coefficients maintain their sign and magnitude across random sub-samples.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) { try { const p = JSON.parse(data); Plotly.react(el.id, p.data, p.layout, {responsive:true,displayModeBar:false}); } catch(e){} }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}

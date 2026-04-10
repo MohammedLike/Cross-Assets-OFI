@@ -1,0 +1,21 @@
+{
+  "tickers": [
+    "NIFTY",
+    "BANKNIFTY",
+    "HDFCBANK",
+    "RELIANCE",
+    "INFY"
+  ],
+  "n_bars": 12098,
+  "date_range": [
+    "2024-01-02 14:45:00",
+    "2025-01-02 15:30:00"
+  ],
+  "bars_per_ticker": {
+    "NIFTY": 12098,
+    "BANKNIFTY": 12098,
+    "HDFCBANK": 12098,
+    "RELIANCE": 12098,
+    "INFY": 12098
+  }
+}

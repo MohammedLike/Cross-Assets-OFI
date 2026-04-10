@@ -1,0 +1,56 @@
+{
+  "title": "Cross-Asset Order Flow Imbalance: Predictive Content and Trading Strategy",
+  "hypothesis": "Order flow imbalance from index-level assets (Nifty) contains predictive information for component stock returns (BankNifty, HDFC Bank, Reliance, Infosys) at short horizons, and this cross-asset signal improves prediction beyond own-asset OFI alone.",
+  "data": {
+    "tickers": [
+      "NIFTY",
+      "BANKNIFTY",
+      "HDFCBANK",
+      "RELIANCE",
+      "INFY"
+    ],
+    "n_bars": 12098,
+    "date_range": [
+      "2024-01-02 14:45:00",
+      "2025-01-02 15:30:00"
+    ],
+    "bars_per_ticker": {
+      "NIFTY": 12098,
+      "BANKNIFTY": 12098,
+      "HDFCBANK": 12098,
+      "RELIANCE": 12098,
+      "INFY": 12098
+    }
+  },
+  "key_findings": [
+    "BANKNIFTY: Best model = XGBOOST (mean IC = 0.0036)",
+    "HDFCBANK: Best model = RIDGE (mean IC = 0.0542)",
+    "RELIANCE: Best model = XGBOOST (mean IC = 0.0213)",
+    "INFY: Best model = OLS (mean IC = 0.0167)",
+    "NIFTY OFI-1m signal half-life \u2248 60.7 min",
+    "BANKNIFTY OFI-1m signal half-life \u2248 69314717.7 min",
+    "HDFCBANK OFI-1m signal half-life \u2248 69181987.5 min",
+    "RELIANCE OFI-1m signal half-life \u2248 45.7 min",
+    "INFY OFI-1m signal half-life \u2248 3.1 min",
+    "Granger: NIFTY \u2192 BANKNIFTY p=0.2448 \u2717",
+    "Granger: NIFTY \u2192 HDFCBANK p=0.0635 \u2717",
+    "Granger: NIFTY \u2192 RELIANCE p=0.6128 \u2717",
+    "Granger: NIFTY \u2192 INFY p=0.1477 \u2717"
+  ],
+  "methodology": [
+    "Tick-rule OFI computed from 5-minute OHLCV bars",
+    "Walk-forward validation (6-month train, 1-month test)",
+    "OLS / Ridge / XGBoost model comparison",
+    "Incremental R\u00b2 test: full (own+cross) vs own-only features",
+    "Granger causality + lead-lag cross-correlation",
+    "HMM regime detection (2-state: low-vol / high-vol)",
+    "Backtest with realistic transaction costs (5 bps + 2 bps slippage)",
+    "SHAP feature importance + bootstrap coefficient stability"
+  ],
+  "limitations": [
+    "OFI proxied from OHLCV (no Level-2 order book data)",
+    "5-minute bars from Yahoo Finance \u2014 limited to ~60 days history",
+    "Transaction cost model is simplified (no market impact curve)",
+    "No position limits or margin constraints in backtest"
+  ]
+}

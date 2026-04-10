@@ -1,0 +1,36 @@
+pandas>=1.5
+numpy>=1.23
+scikit-learn>=1.2
+statsmodels>=0.13
+xgboost>=1.7
+matplotlib>=3.6
+seaborn>=0.12
+pyarrow>=10.0
+jupyter>=1.0
+pytest>=7.0
+scipy>=1.9
+
+# Deep Learning
+torch>=2.0
+torch-geometric>=2.3
+
+# Flask Dashboard
+flask>=3.0
+plotly>=5.15
+
+# Real Data
+yfinance>=0.2.18
+
+# RAG / NLP
+sentence-transformers>=2.2
+faiss-cpu>=1.7
+feedparser>=6.0
+
+# Explainability
+shap>=0.42
+
+# Regime Detection
+hmmlearn>=0.3
+
+# Causality
+arch>=6.0

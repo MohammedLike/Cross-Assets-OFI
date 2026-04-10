@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Causality — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Granger Causality & Lead-Lag{% endblock %}
+{% block page_subtitle %}Testing whether {{ signal_asset }} OFI Granger-causes target asset returns{% endblock %}
+
+{% block content %}
+<!-- Summary Table -->
+{% if summary_rows %}
+<div class="card visible" style="margin-bottom: 24px">
+    <div class="card-header">
+        <h3 class="card-title">Causality Summary: {{ signal_asset }} → Targets</h3>
+        <span class="badge purple">OFI-5min</span>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Target</th>
+                    <th>Best Granger p-value</th>
+                    <th>Best Granger Lag</th>
+                    <th>Optimal Lead-Lag</th>
+                    <th>Max |Correlation|</th>
+                    <th>Significant?</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in summary_rows %}
+                <tr>
+                    <td style="font-weight:600; color: var(--text-primary);">{{ row.target }}</td>
+                    <td class="{% if row.best_granger_pval is not none and row.best_granger_pval < 0.05 %}positive{% else %}negative{% endif %}">
+                        {{ "%.4f"|format(row.best_granger_pval) if row.best_granger_pval is not none else 'N/A' }}
+                    </td>
+                    <td>{{ row.best_granger_lag if row.best_granger_lag is not none else 'N/A' }}</td>
+                    <td>{{ row.optimal_lag if row.optimal_lag is not none else 'N/A' }} bars</td>
+                    <td>{{ "%.4f"|format(row.max_abs_corr) if row.max_abs_corr is not none else 'N/A' }}</td>
+                    <td>
+                        {% if row.best_granger_pval is not none and row.best_granger_pval < 0.05 %}
+                        <span class="badge success">✓ p < 0.05</span>
+                        {% elif row.best_granger_pval is not none and row.best_granger_pval < 0.10 %}
+                        <span class="badge warning">~ p < 0.10</span>
+                        {% else %}
+                        <span class="badge danger">✗ Not sig.</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Granger Heatmap -->
+{% if granger_heatmap %}
+<div class="card visible" style="margin-bottom: 24px">
+    <div class="card-header">
+        <h3 class="card-title">Pairwise Granger Causality Matrix</h3>
+        <span class="badge info">p-values (lower = stronger)</span>
+    </div>
+    <div class="plotly-chart" id="chart-granger-matrix" data-chart='{{ granger_heatmap|safe }}'></div>
+    <div class="highlight-box" style="margin-top:16px">
+        <p><strong>Reading the matrix:</strong> Cell (row, col) shows the p-value for "row Granger-causes col". Green values (p < 0.05) indicate statistically significant predictive relationships. Diagonal is N/A (self-causality is trivial).</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Lead-Lag Charts -->
+<div class="section-header">
+    <h2>Lead-Lag Cross-Correlation</h2>
+    <div class="section-divider"></div>
+</div>
+
+<div class="grid-2">
+    {% for target in target_assets %}
+    {% if target in lead_lag_charts %}
+    <div class="card visible">
+        <div class="card-header">
+            <h3 class="card-title">{{ signal_asset }} → {{ target }}</h3>
+        </div>
+        <div class="plotly-chart" id="chart-ll-{{ target }}" data-chart='{{ lead_lag_charts[target]|safe }}'></div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<div class="highlight-box">
+    <p><strong>Interpretation:</strong> Positive lag means {{ signal_asset }} OFI <strong>leads</strong> the target's OFI. The star marker shows the lag with maximum absolute correlation — if it occurs at a positive lag, information flows from {{ signal_asset }} to the target asset.</p>
+</div>
+{% endblock %}

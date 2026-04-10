@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Regimes — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Regime Detection{% endblock %}
+{% block page_subtitle %}HMM-based volatility regime identification and conditional performance{% endblock %}
+
+{% block content %}
+<!-- Tabs per target -->
+<div class="tabs" id="regimeTabs">
+    {% for target in target_assets %}
+    {% if target in regime_charts %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="regime-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in regime_charts %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="regime-{{ target }}">
+    <!-- Regime Performance Chart -->
+    <div class="card visible" style="margin-bottom: 20px">
+        <div class="card-header">
+            <h3 class="card-title">{{ target }} — Regime-Conditional Performance</h3>
+            <span class="badge purple">2-State HMM</span>
+        </div>
+        <div class="plotly-chart" id="chart-regime-{{ target }}" data-chart='{{ regime_charts[target]|safe }}'></div>
+    </div>
+
+    <!-- Regime Table -->
+    {% if target in regime_tables and regime_tables[target] %}
+    <div class="grid-2">
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">Regime Summary</h3>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Regime</th>
+                            <th>Observations</th>
+                            <th>Count</th>
+                            <th>Mean IC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in regime_tables[target] %}
+                        <tr>
+                            <td>
+                                {% if row.regime == 'high_vol' %}
+                                <span class="badge danger">{{ row.regime }}</span>
+                                {% elif row.regime == 'low_vol' %}
+                                <span class="badge success">{{ row.regime }}</span>
+                                {% else %}
+                                <span class="badge warning">{{ row.regime }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.n_obs }}</td>
+                            <td>{{ row.count }}</td>
+                            <td class="{% if row.ic != 'N/A' and row.ic|float > 0 %}positive{% elif row.ic != 'N/A' and row.ic|float < 0 %}negative{% endif %}">{{ row.ic }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">Methodology</h3>
+            </div>
+            <ul class="report-list">
+                <li>Gaussian HMM fitted on log-returns of {{ target }}</li>
+                <li>2 hidden states: <span class="badge success" style="font-size:0.65rem">low_vol</span> and <span class="badge danger" style="font-size:0.65rem">high_vol</span></li>
+                <li>Full training window used (all regimes) to avoid small-sample bias</li>
+                <li>OOS performance evaluated per-regime</li>
+                <li>Regimes labelled by emission volatility ordering</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="highlight-box">
+    <p><strong>Key Insight:</strong> Market regimes affect OFI signal quality. In <strong>high-volatility</strong> environments, order flow imbalance tends to be more informative because larger dislocations create stronger mean-reversion opportunities. In <strong>low-volatility</strong> regimes, the signal-to-noise ratio drops and transaction costs eat into the smaller expected returns.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) { try { const p = JSON.parse(data); Plotly.react(el.id, p.data, p.layout, {responsive:true,displayModeBar:false}); } catch(e){} }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}

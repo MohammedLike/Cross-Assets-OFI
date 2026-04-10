@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Signal Decay — Cross-Asset OFI Research{% endblock %}
+{% block page_title %}Signal Decay & Half-Life{% endblock %}
+{% block page_subtitle %}Quantifying how fast OFI alpha disappears across horizons{% endblock %}
+
+{% block content %}
+<!-- Tabs for each ticker -->
+<div class="tabs" id="decayTabs">
+    {% for ticker in tickers %}
+    {% if ticker in ic_heatmaps %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="decay-{{ ticker }}">{{ ticker }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for ticker in tickers %}
+{% if ticker in ic_heatmaps %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="decay-{{ ticker }}">
+    <div class="grid-2">
+        <!-- IC Heatmap -->
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">IC Matrix — {{ ticker }}</h3>
+                <span class="badge info">OFI × Forward Horizon</span>
+            </div>
+            <div class="plotly-chart" id="chart-ic-{{ ticker }}" data-chart='{{ ic_heatmaps[ticker]|safe }}'></div>
+        </div>
+
+        <!-- Half-Life Chart -->
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">Signal Half-Life — {{ ticker }}</h3>
+                <span class="badge purple">Exponential Decay Fit</span>
+            </div>
+            <div class="plotly-chart" id="chart-hl-{{ ticker }}" data-chart='{{ hl_charts[ticker]|safe }}'></div>
+        </div>
+    </div>
+
+    <!-- Half-Life Table -->
+    {% if ticker in hl_tables and hl_tables[ticker] %}
+    <div class="card visible" style="margin-top: 16px">
+        <div class="card-header">
+            <h3 class="card-title">Decay Parameters — {{ ticker }}</h3>
+            <span class="badge success">Fitted</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>OFI Horizon</th>
+                        <th>Half-Life</th>
+                        <th>Initial IC (IC₀)</th>
+                        <th>Fit R²</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in hl_tables[ticker] %}
+                    <tr>
+                        <td>{{ row.horizon }}</td>
+                        <td>{{ row.half_life }}</td>
+                        <td>{{ row.ic0 }}</td>
+                        <td>{{ row.r_squared }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="highlight-box">
+        <p><strong>Interpretation:</strong> The IC heatmap shows Spearman rank correlation between OFI signals (rows) and forward returns at different horizons (columns). Shorter OFI windows typically show higher IC at short forward horizons but decay faster — the half-life quantifies exactly when the signal loses 50% of its predictive power.</p>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const parent = this.closest('.tabs');
+        parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        let sibling = parent.nextElementSibling;
+        while (sibling && sibling.classList.contains('tab-content')) {
+            sibling.classList.remove('active');
+            if (sibling.id === tabId) {
+                sibling.classList.add('active');
+                sibling.querySelectorAll('.plotly-chart').forEach(el => {
+                    const data = el.getAttribute('data-chart');
+                    if (data) { try { const p = JSON.parse(data); Plotly.react(el.id, p.data, p.layout, {responsive:true,displayModeBar:false}); } catch(e){} }
+                });
+            }
+            sibling = sibling.nextElementSibling;
+        }
+    });
+});
+</script>
+{% endblock %}
