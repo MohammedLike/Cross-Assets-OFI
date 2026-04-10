@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Model Comparison — Cross-Asset OFI{% endblock %}
+{% block page_title %}Model Comparison{% endblock %}
+{% block page_subtitle %}Linear · Tree · Sequence · Graph · RAG-augmented{% endblock %}
+
+{% block content %}
+
+<div class="card visible" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3 class="card-title">Does complexity add value?</h3>
+    </div>
+    <div style="padding:0 4px 4px; color:var(--text-secondary); line-height:1.6;">
+        <p>This page is the central honesty check of the project. It puts <strong>Ridge (the linear baseline)</strong> next to <strong>XGBoost</strong>, <strong>Transformer</strong>, <strong>GNN</strong>, and <strong>Ridge with retrieved news features</strong> &mdash; all evaluated on the same out-of-sample test windows with the same Information Coefficient metric.</p>
+        <p>Microstructure theory suggests OFI&rarr;return relationships are approximately linear at short horizons. If that's right, Ridge should be hard to beat. If a deep model meaningfully wins, that itself is the result. Either outcome is publishable.</p>
+    </div>
+</div>
+
+{% if comparison_tables %}
+<div class="tabs" id="compTabs">
+    {% for target in target_assets %}
+    {% if target in comparison_tables %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="comp-{{ target }}">{{ target }}</button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in comparison_tables %}
+<div class="tab-content {% if loop.first %}active{% endif %}" id="comp-{{ target }}">
+    <div class="grid-2">
+        <!-- Bar chart -->
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">{{ target }} — IC by Model</h3>
+            </div>
+            {% if target in comparison_charts %}
+            <div id="comp-chart-{{ target }}" class="plotly-chart" data-chart='{{ comparison_charts[target]|safe }}' style="height:380px;"></div>
+            {% endif %}
+        </div>
+
+        <!-- Table -->
+        <div class="card visible">
+            <div class="card-header">
+                <h3 class="card-title">{{ target }} — Performance Table</h3>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Type</th>
+                            <th>OOS IC</th>
+                            <th>OOS R²</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in comparison_tables[target] %}
+                        <tr>
+                            <td style="font-weight:600; color:var(--text-primary);">{{ row.model }}</td>
+                            <td><span class="badge">{{ row.type }}</span></td>
+                            <td class="{% if row.ic_raw and row.ic_raw > 0 %}positive{% else %}negative{% endif %}">{{ row.ic }}</td>
+                            <td>{{ row.r2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% else %}
+<div class="card visible">
+    <p style="color:var(--text-secondary); padding:12px;">
+        Comparison data not yet available. Run <code>python run.py</code> to execute the full pipeline (data fetch → base analysis → advanced models → dashboard).
+    </p>
+</div>
+{% endif %}
+
+<!-- Interview takeaway -->
+<div class="card visible" style="margin-top:24px;">
+    <div class="card-header">
+        <h3 class="card-title">Interview Takeaway</h3>
+        <span class="badge">For prop / quant interviews</span>
+    </div>
+    <div style="padding:0 4px 4px; color:var(--text-secondary); line-height:1.6;">
+        <p style="font-style:italic;">"I tested whether complexity adds value over linear models. Plain Ridge with OFI features captures most of the signal &mdash; the Transformer and GNN add a small marginal improvement on some assets but no clear win, which is consistent with microstructure theory that OFI-return relationships are approximately linear at short horizons. The RAG news pipeline adds meaningful context on event-driven days but is noisy on average."</p>
+    </div>
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('#compTabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#compTabs .tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+});
+</script>
+
+{% endblock %}

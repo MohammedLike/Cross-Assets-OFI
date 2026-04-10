@@ -1,0 +1,14 @@
+{
+  "BANKNIFTY": {
+    "error": "operands could not be broadcast together with shapes (12098,) (12093,) "
+  },
+  "HDFCBANK": {
+    "error": "operands could not be broadcast together with shapes (12098,) (12093,) "
+  },
+  "RELIANCE": {
+    "error": "operands could not be broadcast together with shapes (12098,) (12093,) "
+  },
+  "INFY": {
+    "error": "operands could not be broadcast together with shapes (12098,) (12093,) "
+  }
+}

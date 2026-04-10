@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Market Context (RAG) — Cross-Asset OFI{% endblock %}
+{% block page_title %}Market Context (RAG){% endblock %}
+{% block page_subtitle %}News retrieval + sentiment fused with OFI features{% endblock %}
+
+{% block content %}
+
+<div class="card visible" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3 class="card-title">Why fuse news with OFI?</h3>
+    </div>
+    <div style="padding:0 4px 4px; color:var(--text-secondary); line-height:1.6;">
+        <p>OFI tells us <em>what</em> the market is doing. News tells us <em>why</em>. The RAG pipeline retrieves recent financial headlines from Indian sources (Moneycontrol, Economic Times, Mint, Business Standard), embeds them with sentence-transformers, indexes them in FAISS, and converts each bar into a small set of news features: <em>article count in window, average sentiment, asset-specific mention counts</em>. These augment the Ridge feature matrix to test whether information shocks add predictive power beyond microstructure alone.</p>
+    </div>
+</div>
+
+{% if has_news %}
+<!-- Top-level metrics -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-label">Articles Indexed</div>
+        <div class="metric-value">{{ context.n_articles }}</div>
+        <div class="metric-sub">{{ context.n_sources }} sources</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Mean Sentiment</div>
+        <div class="metric-value {% if context.mean_sentiment > 0 %}positive{% else %}negative{% endif %}">
+            {{ "%.3f"|format(context.mean_sentiment) }}
+        </div>
+        <div class="metric-sub">Range: [-1, +1]</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-label">Date Range</div>
+        <div class="metric-value" style="font-size:1.1rem;">
+            {% if context.date_range[0] %}{{ context.date_range[0][:10] }}{% else %}—{% endif %}
+        </div>
+        <div class="metric-sub">to {% if context.date_range[1] %}{{ context.date_range[1][:10] }}{% else %}—{% endif %}</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-top:24px;">
+    <!-- Sentiment pie -->
+    <div class="card visible">
+        <div class="card-header">
+            <h3 class="card-title">Sentiment Distribution</h3>
+        </div>
+        {% if sentiment_chart %}
+        <div id="sentiment-chart" class="plotly-chart" data-chart='{{ sentiment_chart|safe }}' style="height:350px;"></div>
+        {% endif %}
+    </div>
+
+    <!-- Marginal contribution -->
+    <div class="card visible">
+        <div class="card-header">
+            <h3 class="card-title">News Marginal Contribution (Ridge)</h3>
+            <span class="badge purple">ΔIC test</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>IC (OFI)</th>
+                        <th>IC (OFI + News)</th>
+                        <th>ΔIC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in marginal_rows %}
+                    <tr>
+                        <td style="font-weight:600; color:var(--text-primary);">{{ row.target }}</td>
+                        <td>{{ row.ic_ofi }}</td>
+                        <td>{{ row.ic_combined }}</td>
+                        <td class="{% if row.delta_positive %}positive{% else %}negative{% endif %}">{{ row.delta_ic }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p style="margin-top:12px; color:var(--text-secondary); font-size:0.85rem; padding:0 4px;">
+            ΔIC > 0 means news features improve prediction. Small/negative values mean OFI already captures the relevant information.
+        </p>
+    </div>
+</div>
+
+<!-- Top news -->
+<div class="card visible" style="margin-top:24px;">
+    <div class="card-header">
+        <h3 class="card-title">Latest Indexed Headlines</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Source</th>
+                    <th>Published</th>
+                    <th>Sentiment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in top_news %}
+                <tr>
+                    <td>{{ row.title }}</td>
+                    <td><span class="badge">{{ row.source }}</span></td>
+                    <td style="font-family:'JetBrains Mono', monospace; font-size:0.85rem;">
+                        {% if row.published %}{{ row.published[:16] }}{% endif %}
+                    </td>
+                    <td class="{% if row.sentiment > 0 %}positive{% elif row.sentiment < 0 %}negative{% endif %}">
+                        {{ "%.2f"|format(row.sentiment) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Sample retrievals per asset -->
+{% if retrievals %}
+<div class="section-header" style="margin-top:32px;">
+    <h2>Per-Asset RAG Retrievals</h2>
+    <div class="section-divider"></div>
+    <span class="badge purple">FAISS · sentence-transformers</span>
+</div>
+
+<div class="grid-2">
+    {% for target in target_assets %}
+    {% if target in retrievals %}
+    <div class="card visible">
+        <div class="card-header">
+            <h3 class="card-title">{{ target }}</h3>
+            <span class="badge">Top 5 retrieved</span>
+        </div>
+        <div style="padding:0 4px;">
+            {% for item in retrievals[target] %}
+            <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+                <div style="font-weight:500; color:var(--text-primary); font-size:0.9rem; line-height:1.4;">
+                    {{ item.title }}
+                </div>
+                <div style="margin-top:4px; display:flex; gap:8px; align-items:center; font-size:0.78rem;">
+                    <span class="badge">{{ item.source }}</span>
+                    <span style="color:var(--text-secondary);">{{ item.published[:16] }}</span>
+                    <span class="{% if item.sentiment > 0 %}positive{% elif item.sentiment < 0 %}negative{% endif %}" style="margin-left:auto;">
+                        {{ "%.2f"|format(item.sentiment) }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card visible">
+    <p style="color:var(--text-secondary); padding:12px;">
+        News data not yet fetched. Run <code>python run.py</code> with internet access to execute the full pipeline, or <code>python scripts/run_advanced_analysis.py</code> for advanced models only.
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}

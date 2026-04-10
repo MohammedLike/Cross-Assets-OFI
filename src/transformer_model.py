@@ -38,10 +38,14 @@ class OFISequenceDataset(Dataset):
         available = [c for c in ofi_cols if c in ofi_df.columns]
         self.n_assets = len(available)
 
-        ofi_arr = ofi_df[available].values.astype(np.float32)
-        y_arr = y.values.astype(np.float32)
+        # Align ofi_df and y on a common index BEFORE converting to numpy.
+        # `y` (from prepare_dataset) has NaNs already dropped, so its index
+        # is a subset of ofi_df.index. Without this join the two arrays
+        # have different lengths and the boolean mask below would fail.
+        joined = ofi_df[available].join(y.rename("__y__"), how="inner").dropna()
+        ofi_arr = joined[available].values.astype(np.float32)
+        y_arr = joined["__y__"].values.astype(np.float32)
 
-        # Align indices
         valid = ~(np.isnan(ofi_arr).any(axis=1) | np.isnan(y_arr))
         self.ofi = ofi_arr[valid]
         self.y = y_arr[valid]

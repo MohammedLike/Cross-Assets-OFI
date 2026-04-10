@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Transformer & GNN — Cross-Asset OFI{% endblock %}
+{% block page_title %}Transformer & GNN{% endblock %}
+{% block page_subtitle %}Sequence and graph deep-learning models for cross-asset OFI{% endblock %}
+
+{% block content %}
+
+<!-- Method explainer -->
+<div class="card visible" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3 class="card-title">Why deep learning here?</h3>
+    </div>
+    <div style="padding:0 4px 4px; color:var(--text-secondary); line-height:1.6;">
+        <p><strong>Cross-Asset Transformer.</strong> Takes a sequence of recent OFI values from <em>all</em> assets and uses multi-head self-attention to learn dynamic lead-lag patterns &mdash; e.g. <em>which</em> asset's order flow matters at <em>which</em> time, conditional on context.</p>
+        <p><strong>Graph Attention Network (GNN).</strong> Models the universe as a graph where nodes are assets and edges are learned influence weights. Each forward pass passes OFI features along edges and the GAT layer learns which neighbours matter most for predicting the target node's return.</p>
+        <p><strong>The honest test.</strong> If complexity adds value, these models should beat plain Ridge in OOS IC. If they don't, the relationship is approximately linear &mdash; consistent with microstructure theory and a publishable finding in itself.</p>
+    </div>
+</div>
+
+<!-- Transformer Section -->
+<div class="section-header">
+    <h2>Cross-Asset Transformer</h2>
+    <div class="section-divider"></div>
+    <span class="badge purple">PyTorch · Multi-head attention</span>
+</div>
+
+{% if transformer_metrics %}
+<div class="metrics-grid">
+    {% for target in target_assets %}
+    {% if target in transformer_metrics %}
+    {% set m = transformer_metrics[target] %}
+    <div class="metric-card">
+        <div class="metric-label">{{ target }} — Transformer IC</div>
+        <div class="metric-value {% if m.ic and m.ic > 0 %}positive{% else %}negative{% endif %}">
+            {% if m.ic is not none %}{{ "%.4f"|format(m.ic) }}{% else %}N/A{% endif %}
+        </div>
+        <div class="metric-sub">
+            {% if m.epochs %}Epochs: {{ m.epochs }} · n={{ m.n_samples }}{% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in transformer_charts %}
+<div class="card visible" style="margin-top:24px;">
+    <div class="card-header">
+        <h3 class="card-title">{{ target }} — Training Curves</h3>
+        {% if transformer_metrics[target].config %}
+        <span class="badge">d_model={{ transformer_metrics[target].config.d_model }} · heads={{ transformer_metrics[target].config.n_heads }} · layers={{ transformer_metrics[target].config.n_layers }} · seq_len={{ transformer_metrics[target].config.seq_len }}</span>
+        {% endif %}
+    </div>
+    <div id="tr-chart-{{ target }}" class="plotly-chart" data-chart='{{ transformer_charts[target]|safe }}' style="height:350px;"></div>
+</div>
+{% endif %}
+
+{% if target in attention_charts %}
+<div class="card visible" style="margin-top:16px;">
+    <div class="card-header">
+        <h3 class="card-title">{{ target }} — Attention Map</h3>
+        <span class="badge purple">Interpretability</span>
+    </div>
+    <div id="attn-chart-{{ target }}" class="plotly-chart" data-chart='{{ attention_charts[target]|safe }}' style="height:350px;"></div>
+    <p style="margin-top:12px; color:var(--text-secondary); font-size:0.85rem;">
+        Brighter cells indicate timesteps the model attends to most when forming its prediction. A diagonal pattern means recent OFI dominates; off-diagonal patterns indicate the model is learning longer-range dependencies.
+    </p>
+</div>
+{% endif %}
+{% endfor %}
+
+{% else %}
+<div class="card visible">
+    <p style="color:var(--text-secondary); padding:12px;">
+        Transformer results not yet available. Run <code>python run.py</code> to execute the full pipeline, or <code>python scripts/run_advanced_analysis.py</code> to train advanced models only.
+    </p>
+</div>
+{% endif %}
+
+<!-- GNN Section -->
+<div class="section-header" style="margin-top:40px;">
+    <h2>Graph Attention Network (GAT)</h2>
+    <div class="section-divider"></div>
+    <span class="badge purple">PyTorch Geometric · Cross-asset graph</span>
+</div>
+
+{% if gnn_metrics %}
+<div class="metrics-grid">
+    {% for target in target_assets %}
+    {% if target in gnn_metrics %}
+    {% set g = gnn_metrics[target] %}
+    <div class="metric-card">
+        <div class="metric-label">{{ target }} — GNN IC</div>
+        <div class="metric-value {% if g.ic and g.ic > 0 %}positive{% else %}negative{% endif %}">
+            {% if g.ic is not none %}{{ "%.4f"|format(g.ic) }}{% else %}N/A{% endif %}
+        </div>
+        <div class="metric-sub">
+            {% if g.n_graphs %}Graphs: {{ g.n_graphs }} · Epochs: {{ g.epochs }}{% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% for target in target_assets %}
+{% if target in gnn_charts %}
+<div class="card visible" style="margin-top:24px;">
+    <div class="card-header">
+        <h3 class="card-title">{{ target }} — GNN Training</h3>
+    </div>
+    <div id="gnn-chart-{{ target }}" class="plotly-chart" data-chart='{{ gnn_charts[target]|safe }}' style="height:300px;"></div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% else %}
+<div class="card visible">
+    <p style="color:var(--text-secondary); padding:12px;">
+        GNN results not yet available. Install <code>torch-geometric</code> and run <code>python run.py</code> to execute the full pipeline.
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}

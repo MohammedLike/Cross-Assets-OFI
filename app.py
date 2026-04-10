@@ -716,6 +716,247 @@ def models():
     )
 
 
+@app.route("/transformer")
+def transformer_page():
+    """Cross-Asset Transformer results page."""
+    tr_results = load_json("transformer_results")
+    gnn_results = load_json("gnn_results")
+
+    transformer_charts = {}
+    transformer_metrics = {}
+    attention_charts = {}
+
+    for target in TARGET_ASSETS:
+        if target not in tr_results or "error" in tr_results.get(target, {}):
+            continue
+        td = tr_results[target]
+
+        # Training history chart
+        history = td.get("history", {})
+        if history.get("train_loss"):
+            fig = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=("Loss", "Validation IC"),
+            )
+            epochs = list(range(1, len(history["train_loss"]) + 1))
+            fig.add_trace(
+                go.Scatter(x=epochs, y=history["train_loss"],
+                           name="Train", line=dict(color=COLORS["primary"])),
+                row=1, col=1,
+            )
+            fig.add_trace(
+                go.Scatter(x=epochs, y=history["val_loss"],
+                           name="Val", line=dict(color=COLORS["danger"])),
+                row=1, col=1,
+            )
+            fig.add_trace(
+                go.Scatter(x=epochs, y=history["val_ic"],
+                           name="Val IC", line=dict(color=COLORS["success"])),
+                row=1, col=2,
+            )
+            fig.update_layout(
+                template=DARK_TEMPLATE, height=350,
+                showlegend=True, margin=dict(t=40, b=40, l=40, r=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            )
+            transformer_charts[target] = to_plotly_json(fig)
+
+        # Attention heatmap (last layer averaged)
+        if "attention_map" in td:
+            attn = np.array(td["attention_map"])
+            if attn.ndim == 3:
+                attn = attn[-1]  # last layer
+            fig_attn = go.Figure(data=go.Heatmap(
+                z=attn, colorscale="Viridis", showscale=True,
+            ))
+            fig_attn.update_layout(
+                template=DARK_TEMPLATE, height=350,
+                title="Attention Map (last layer, avg across heads)",
+                xaxis_title="Key timestep", yaxis_title="Query timestep",
+                margin=dict(t=40, b=40, l=40, r=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            )
+            attention_charts[target] = to_plotly_json(fig_attn)
+
+        transformer_metrics[target] = {
+            "ic": td.get("ic"),
+            "mse": td.get("mse"),
+            "n_samples": td.get("n_samples"),
+            "epochs": td.get("epochs_trained"),
+            "best_val_ic": td.get("best_val_ic"),
+            "config": td.get("config", {}),
+        }
+
+    # GNN section
+    gnn_metrics = {}
+    gnn_charts = {}
+    for target in TARGET_ASSETS:
+        if target not in gnn_results or "error" in gnn_results.get(target, {}):
+            continue
+        gd = gnn_results[target]
+        gnn_metrics[target] = {
+            "ic": gd.get("ic"),
+            "mse": gd.get("mse"),
+            "n_graphs": gd.get("n_graphs"),
+            "epochs": gd.get("epochs_trained"),
+            "best_val_ic": gd.get("best_val_ic"),
+        }
+        history = gd.get("history", {})
+        if history.get("train_loss"):
+            fig = go.Figure()
+            epochs = list(range(1, len(history["train_loss"]) + 1))
+            fig.add_trace(go.Scatter(x=epochs, y=history["train_loss"],
+                                     name="Train Loss", line=dict(color=COLORS["primary"])))
+            fig.add_trace(go.Scatter(x=epochs, y=history["val_loss"],
+                                     name="Val Loss", line=dict(color=COLORS["danger"])))
+            fig.update_layout(
+                template=DARK_TEMPLATE, height=300,
+                title=f"GNN Training — {target}",
+                margin=dict(t=40, b=40, l=40, r=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            )
+            gnn_charts[target] = to_plotly_json(fig)
+
+    return render_template(
+        "transformer.html",
+        transformer_charts=transformer_charts,
+        attention_charts=attention_charts,
+        transformer_metrics=transformer_metrics,
+        gnn_metrics=gnn_metrics,
+        gnn_charts=gnn_charts,
+        target_assets=TARGET_ASSETS,
+    )
+
+
+@app.route("/model-comparison")
+def model_comparison_page():
+    """Unified model comparison: Ridge / XGB / Transformer / GNN / RAG."""
+    comp = load_json("model_comparison")
+
+    comparison_tables = {}
+    comparison_charts = {}
+
+    for target in TARGET_ASSETS:
+        rows = comp.get(target, [])
+        if not rows:
+            continue
+
+        # Build table rows
+        table_rows = []
+        for r in rows:
+            table_rows.append({
+                "model": r.get("model", "—"),
+                "type": r.get("type", "—"),
+                "ic": f"{r['ic']:.4f}" if r.get("ic") is not None else "N/A",
+                "r2": f"{r['r2']:.6f}" if r.get("r2") is not None else "N/A",
+                "ic_raw": r.get("ic") or 0,
+            })
+        comparison_tables[target] = table_rows
+
+        # Bar chart of IC values
+        models = [r["model"] for r in rows if r.get("ic") is not None]
+        ics = [r["ic"] for r in rows if r.get("ic") is not None]
+        colors = [
+            COLORS["success"] if (ic or 0) > 0 else COLORS["danger"]
+            for ic in ics
+        ]
+
+        fig = go.Figure(data=[go.Bar(
+            x=models, y=ics, marker_color=colors,
+            text=[f"{ic:.4f}" for ic in ics], textposition="auto",
+        )])
+        fig.update_layout(
+            template=DARK_TEMPLATE,
+            title=f"{target} — Information Coefficient by Model",
+            yaxis_title="Mean OOS IC",
+            xaxis_title="",
+            height=380,
+            margin=dict(t=50, b=80, l=40, r=20),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        )
+        fig.add_hline(y=0, line_dash="dash", line_color="gray")
+        comparison_charts[target] = to_plotly_json(fig)
+
+    return render_template(
+        "model_comparison.html",
+        comparison_tables=comparison_tables,
+        comparison_charts=comparison_charts,
+        target_assets=TARGET_ASSETS,
+    )
+
+
+@app.route("/market-context")
+def market_context_page():
+    """RAG news context page — sentiment + retrievals + marginal contribution."""
+    rag = load_json("rag_news")
+
+    context = {
+        "n_articles": rag.get("n_articles", 0),
+        "n_sources": rag.get("n_sources", 0),
+        "date_range": rag.get("date_range", [None, None]),
+        "mean_sentiment": rag.get("mean_sentiment", 0.0),
+    }
+
+    sentiment_dist = rag.get("sentiment_distribution", {})
+    sentiment_chart = None
+    if sentiment_dist:
+        labels = list(sentiment_dist.keys())
+        values = [sentiment_dist[k] for k in labels]
+        colors_pie = [COLORS["success"], COLORS["text"], COLORS["danger"]]
+        fig = go.Figure(data=[go.Pie(
+            labels=labels, values=values, marker=dict(colors=colors_pie),
+            hole=0.5,
+        )])
+        fig.update_layout(
+            template=DARK_TEMPLATE, title="News Sentiment Distribution",
+            height=350,
+            margin=dict(t=50, b=20, l=20, r=20),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        )
+        sentiment_chart = to_plotly_json(fig)
+
+    # Top news table
+    top_news = []
+    tn = rag.get("top_news", {})
+    if isinstance(tn, dict) and "title" in tn:
+        n_rows = len(tn["title"])
+        for i in range(n_rows):
+            top_news.append({
+                "title": tn["title"][i],
+                "source": tn["source"][i] if i < len(tn.get("source", [])) else "",
+                "published": tn["published"][i] if i < len(tn.get("published", [])) else "",
+                "sentiment": tn["sentiment"][i] if i < len(tn.get("sentiment", [])) else 0.0,
+            })
+
+    # Marginal contribution table
+    marginal = rag.get("marginal_contribution", {})
+    marginal_rows = []
+    for target in TARGET_ASSETS:
+        if target in marginal and "error" not in marginal[target]:
+            m = marginal[target]
+            marginal_rows.append({
+                "target": target,
+                "ic_ofi": f"{m['ic_ofi_only']:.4f}" if m.get("ic_ofi_only") is not None else "N/A",
+                "ic_combined": f"{m['ic_ofi_plus_news']:.4f}" if m.get("ic_ofi_plus_news") is not None else "N/A",
+                "delta_ic": f"{m['delta_ic']:.4f}" if m.get("delta_ic") is not None else "N/A",
+                "delta_positive": (m.get("delta_ic") or 0) > 0,
+            })
+
+    # Sample retrievals per asset
+    retrievals = rag.get("sample_retrievals", {})
+
+    return render_template(
+        "market_context.html",
+        context=context,
+        sentiment_chart=sentiment_chart,
+        top_news=top_news,
+        marginal_rows=marginal_rows,
+        retrievals=retrievals,
+        target_assets=TARGET_ASSETS,
+        has_news=context["n_articles"] > 0,
+    )
+
+
 @app.route("/research")
 def research():
     """Research paper-style report page."""
