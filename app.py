@@ -1,12 +1,3 @@
-"""
-Cross-Asset OFI Research Dashboard — Flask Application.
-
-A premium research dashboard that presents real analysis results
-from the Cross-Asset Order Flow Imbalance study.
-
-Run:
-    python app.py
-"""
 import json
 import os
 from pathlib import Path
