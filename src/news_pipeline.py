@@ -112,6 +112,7 @@ def fetch_all_news(feeds: dict = None, max_per_feed: int = 100) -> pd.DataFrame:
     Fetch all configured RSS feeds and return as DataFrame.
 
     Returns DataFrame with columns: source, title, summary, published, link.
+    Falls back to synthetic news if no articles are fetched (network issues, etc.).
     """
     feeds = feeds or INDIA_FINANCE_FEEDS
     rows = []
@@ -125,6 +126,94 @@ def fetch_all_news(feeds: dict = None, max_per_feed: int = 100) -> pd.DataFrame:
         df["published"] = pd.to_datetime(df["published"], errors="coerce")
         df = df.dropna(subset=["title"]).drop_duplicates(subset=["title"])
         df = df.sort_values("published", ascending=False).reset_index(drop=True)
+
+    # Fallback: generate synthetic news so the RAG pipeline always has data
+    if len(df) == 0:
+        df = _generate_synthetic_news()
+
+    return df
+
+
+def _generate_synthetic_news() -> pd.DataFrame:
+    """
+    Generate realistic synthetic financial news headlines for demo/offline use.
+    Covers the past 7 days with ~50 articles to exercise the full RAG pipeline.
+    """
+    import random
+    rng = random.Random(42)
+    now = datetime.now()
+
+    templates = [
+        # Positive
+        ("Nifty 50 rallies to new all-time high on strong FII inflows", "moneycontrol_markets", 0.7),
+        ("BankNifty surges 2% as RBI holds rates steady", "et_markets", 0.8),
+        ("HDFC Bank posts record quarterly profit, beats estimates", "moneycontrol_business", 0.9),
+        ("Reliance Industries gains on retail expansion plans", "et_stocks", 0.6),
+        ("Infosys upgrades revenue guidance, stock climbs 3%", "livemint_markets", 0.7),
+        ("Foreign investors pump ₹5,000 crore into Indian equities", "businessstandard_markets", 0.6),
+        ("IT sector leads market rally on strong US demand outlook", "et_markets", 0.5),
+        ("Banking stocks advance as credit growth accelerates", "moneycontrol_markets", 0.5),
+        ("Nifty crosses 23,000 mark for first time amid global optimism", "et_markets", 0.8),
+        ("HDFC Bank market cap surpasses ₹14 lakh crore milestone", "moneycontrol_business", 0.6),
+        ("Reliance Jio subscriber additions beat Street expectations", "livemint_markets", 0.5),
+        ("India GDP growth forecast raised to 7.2% by IMF", "businessstandard_markets", 0.7),
+        ("Auto sector stocks soar on record monthly sales data", "et_stocks", 0.6),
+        ("Mutual fund SIP flows hit record ₹19,000 crore in March", "moneycontrol_markets", 0.5),
+        ("Metal stocks rally as China stimulus boosts commodity prices", "et_markets", 0.4),
+        # Negative
+        ("Market volatility spikes as crude oil prices surge above $90", "et_markets", -0.6),
+        ("FIIs turn net sellers, pull ₹3,000 crore from equities", "moneycontrol_markets", -0.5),
+        ("BankNifty falls 1.5% on concerns over rising NPAs", "livemint_markets", -0.7),
+        ("Infosys shares decline after key client contract loss", "et_stocks", -0.6),
+        ("Rupee weakens to 84 against dollar amid global risk-off", "businessstandard_markets", -0.4),
+        ("HDFC Bank faces regulatory scrutiny over compliance issues", "moneycontrol_business", -0.5),
+        ("Nifty slips below 22,800 as profit booking intensifies", "et_markets", -0.4),
+        ("Global recession fears weigh on Indian market sentiment", "livemint_markets", -0.6),
+        ("IT stocks under pressure as US tech layoffs continue", "et_stocks", -0.5),
+        ("Reliance shares drop 2% on refinery margin concerns", "moneycontrol_business", -0.4),
+        # Neutral
+        ("RBI monetary policy committee to meet next week", "moneycontrol_markets", 0.0),
+        ("Market update: Nifty trades flat amid mixed global cues", "et_markets", 0.0),
+        ("SEBI proposes new regulations for algorithmic trading", "businessstandard_markets", 0.1),
+        ("India-US trade talks resume focus on tariff reductions", "livemint_markets", 0.0),
+        ("Quarterly results season kicks off with IT majors reporting", "et_stocks", 0.1),
+        ("Options expiry keeps market in tight range", "moneycontrol_markets", 0.0),
+        ("Fund managers maintain cautious stance on midcap valuations", "businessstandard_markets", -0.1),
+        ("Crude oil prices steady near $85 per barrel", "livemint_markets", 0.0),
+        ("Government bond yields ease after successful auction", "et_markets", 0.2),
+        ("GST collections cross ₹1.7 lakh crore for fifth straight month", "moneycontrol_business", 0.3),
+    ]
+
+    rows = []
+    for i, (title, source, _) in enumerate(templates):
+        # Spread articles across the past 7 days
+        hours_ago = rng.uniform(0, 7 * 24)
+        published = now - timedelta(hours=hours_ago)
+        rows.append({
+            "source": source,
+            "title": title,
+            "summary": f"Market analysis: {title}. Analysts expect continued movement.",
+            "published": published,
+            "link": f"https://example.com/news/{i}",
+        })
+
+    # Add some duplicates with slight time variations for realism
+    for i in range(10):
+        base = rng.choice(templates)
+        hours_ago = rng.uniform(0, 7 * 24)
+        published = now - timedelta(hours=hours_ago)
+        rows.append({
+            "source": base[1],
+            "title": f"{base[0]} - Update",
+            "summary": f"Follow-up: {base[0]}. Market participants react.",
+            "published": published,
+            "link": f"https://example.com/news/update/{i}",
+        })
+
+    df = pd.DataFrame(rows)
+    df["published"] = pd.to_datetime(df["published"])
+    df = df.sort_values("published", ascending=False).reset_index(drop=True)
+    warnings.warn("Using synthetic news data (RSS feeds unavailable)")
     return df
 
 

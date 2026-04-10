@@ -11,6 +11,24 @@
       "ic": 0.0036133515777003675,
       "r2": -0.26753273158776336,
       "type": "Tree"
+    },
+    {
+      "model": "Transformer",
+      "ic": 0.02320308585502532,
+      "r2": null,
+      "type": "Sequence"
+    },
+    {
+      "model": "GNN (GAT)",
+      "ic": 0.026311237816930916,
+      "r2": null,
+      "type": "Graph"
+    },
+    {
+      "model": "Ridge (OFI + News)",
+      "ic": -0.029003348431937553,
+      "r2": -0.04395484942646274,
+      "type": "Linear+RAG"
     }
   ],
   "HDFCBANK": [
@@ -25,6 +43,24 @@
       "ic": -0.005887485926307148,
       "r2": -0.21223408107908856,
       "type": "Tree"
+    },
+    {
+      "model": "Transformer",
+      "ic": 0.028810581862684686,
+      "r2": null,
+      "type": "Sequence"
+    },
+    {
+      "model": "GNN (GAT)",
+      "ic": -0.02493340652692988,
+      "r2": null,
+      "type": "Graph"
+    },
+    {
+      "model": "Ridge (OFI + News)",
+      "ic": 0.05416971555824235,
+      "r2": -0.025882806934609925,
+      "type": "Linear+RAG"
     }
   ],
   "RELIANCE": [
@@ -39,6 +75,24 @@
       "ic": 0.021346432469460486,
       "r2": -0.14781257028806113,
       "type": "Tree"
+    },
+    {
+      "model": "Transformer",
+      "ic": 0.019897222370080896,
+      "r2": null,
+      "type": "Sequence"
+    },
+    {
+      "model": "GNN (GAT)",
+      "ic": 0.024609878777910595,
+      "r2": null,
+      "type": "Graph"
+    },
+    {
+      "model": "Ridge (OFI + News)",
+      "ic": -0.00030180594360295726,
+      "r2": -0.05633171379194496,
+      "type": "Linear+RAG"
     }
   ],
   "INFY": [
@@ -53,6 +107,24 @@
       "ic": 0.004494435002889283,
       "r2": -0.13063674388332586,
       "type": "Tree"
+    },
+    {
+      "model": "Transformer",
+      "ic": 0.0014490492260179027,
+      "r2": null,
+      "type": "Sequence"
+    },
+    {
+      "model": "GNN (GAT)",
+      "ic": 0.015295765089645967,
+      "r2": null,
+      "type": "Graph"
+    },
+    {
+      "model": "Ridge (OFI + News)",
+      "ic": 0.00992494318428958,
+      "r2": -0.033463495649872756,
+      "type": "Linear+RAG"
     }
   ]
 }

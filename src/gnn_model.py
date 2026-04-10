@@ -66,16 +66,24 @@ def build_graph_data(
                 dst.append(j)
     edge_index = torch.tensor([src, dst], dtype=torch.long)
 
+    # Align ofi_df and y on a common index BEFORE iterating.
+    # `y` (from prepare_dataset) has NaN rows already dropped, so its index
+    # is a strict subset of ofi_df.index.  Without this join, positional
+    # indexing (iloc) goes out-of-bounds because y is shorter than ofi_df.
+    ofi_cols_needed = [f"{t}_ofi_{h}" for t in tickers for h in horizons
+                       if f"{t}_ofi_{h}" in ofi_df.columns]
+    joined = ofi_df[ofi_cols_needed].join(y.rename("__y__"), how="inner").dropna()
+
     # Extract node features per timestep
     graphs = []
-    for t_idx in range(len(ofi_df)):
+    for t_idx in range(len(joined)):
         node_feats = []
         skip = False
         for ticker in tickers:
             feats = []
             for h in horizons:
                 col = f"{ticker}_ofi_{h}"
-                val = ofi_df[col].iloc[t_idx]
+                val = joined[col].iloc[t_idx]
                 if np.isnan(val):
                     skip = True
                     break
@@ -84,11 +92,11 @@ def build_graph_data(
                 break
             node_feats.append(feats)
 
-        if skip or np.isnan(y.iloc[t_idx]):
+        if skip:
             continue
 
         x = torch.tensor(node_feats, dtype=torch.float32)  # [N, H]
-        target = torch.tensor(y.iloc[t_idx], dtype=torch.float32)
+        target = torch.tensor(joined["__y__"].iloc[t_idx], dtype=torch.float32)
 
         data = Data(x=x, edge_index=edge_index, y=target)
         data.target_node = target_node_idx
